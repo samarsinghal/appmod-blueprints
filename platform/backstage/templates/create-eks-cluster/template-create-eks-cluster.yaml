@@ -1,42 +1,47 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  description: Creates Kubernetes Spark Job
-  name: argo-workflows-spark-job
-  title: Basic Argo Workflow with a Spark Job
+  description: Deploys dev and prod clusters
+  name: create-eks-cluster
+  title: Create EKS Clusters
 spec:
   owner: guest
   type: service
   parameters:
-    - title: Configuration Options
-      required:
-        - name
-      properties:
+    - properties:
         name:
+          title: name of this entry
           type: string
-          description: name of this application
-        mainApplicationFile:
+        namespace:
+          default: flux-system
+          title: namespace within the kubernetes cluster to deploy this
           type: string
-          default: 'local:///opt/spark/examples/jars/spark-examples_2.12-3.1.3.jar'
-          description: Path to the main application file
+        aws_region:
+          default: us-west-2
+          title: aws region with codebuild project
+          type: string
         repoUrl:
-          default: gitea.elamaras.people.aws.dev
-          title: Repo URL of your Gitea Repo integrated with Backstage
+          title: URL of gitea on management cluster
           type: string
+      title: Configuration Options
+      required:
+        - repoUrl
   steps:
-    - id: template
-      name: Generating component
-      action: fetch:template
+    - action: fetch:template
+      id: fetch-base
       input:
-        url: ./skeleton
+        url: ./templates-create-eks-cluster/
         values:
-          name: ${{parameters.name}}
-          repoUrl: ${{parameters.repoUrl}}
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          aws_region: ${{ parameters.aws_region }}
+      name: Fetch Base
     - id: publish
       name: Publishing to a gitea git repository
       action: publish:gitea
       input:
-        description: This is an example app
+        description: CodeBuild create clusters template
+        # Hard coded value for this demo purposes only.
         repoUrl: ${{parameters.repoUrl}}?repo=${{parameters.name}}
         defaultBranch: main
     - id: create-argocd-app
@@ -44,9 +49,10 @@ spec:
       action: cnoe:create-argocd-app
       input:
         appName: ${{parameters.name}}
-        appNamespace: ${{parameters.name}}
+        appNamespace: ${{parameters.namespace}}
         argoInstance: in-cluster
         projectName: default
+        # necessary until we generate our own cert
         repoUrl: http://my-gitea-http.gitea.svc.cluster.local:3000/giteaAdmin/${{parameters.name}}
         path: "manifests"
     - id: register
@@ -60,3 +66,4 @@ spec:
       - title: Open in catalog
         icon: catalog
         entityRef: ${{ steps['register'].output.entityRef }}
+
