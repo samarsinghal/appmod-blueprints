@@ -1,59 +1,46 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  description: Creates Amazon RDS Database with CrossPlane
-  name: db-cluster-rds
-  title: Creates an Amazon RDS Database
+  description: Deploys dev and prod clusters on EKS
+  name: create-dev-and-prod-env
+  title: Create Dev and Prod Environment
 spec:
   owner: guest
   type: service
   parameters:
     - properties:
         name:
-          title: Application Name
+          title: name of this entry
           type: string
-          description: Unique name of the component
-          ui:autofocus: true
         namespace:
           default: flux-system
           title: namespace within the kubernetes cluster to deploy this
           type: string
-        region:
-          title: aws region
+        aws_region:
+          default: us-west-2
+          title: aws region with codebuild project
           type: string
-        subnetIds:
-          title: Subnet IDs
-          description: ID of subnets for rds cluster
-          type: array
-          items:
-            type: string
         repoUrl:
-          title: Gitea URL
+          title: URL of gitea on management cluster
           type: string
-          description: Gitea URL on Management cluster
       title: Configuration Options
       required:
-        - name
         - repoUrl
-        - region
-        - subnetIds
   steps:
     - action: fetch:template
       id: fetch-base
       input:
-        url: ./skeleton/
+        url: ./templates-create-dev-and-prod-env/
         values:
           name: ${{ parameters.name }}
           namespace: ${{ parameters.namespace }}
-          region: ${{ parameters.region }}
-          repoUrl: ${{parameters.repoUrl}}
-          subnetIds: ${{parameters.subnetIds}}
+          aws_region: ${{ parameters.aws_region }}
       name: Fetch Base
     - id: publish
       name: Publishing to a gitea git repository
       action: publish:gitea
       input:
-        description: RDS Cluster manifests
+        description: CodeBuild create clusters template
         # Hard coded value for this demo purposes only.
         repoUrl: ${{parameters.repoUrl}}?repo=${{parameters.name}}
         defaultBranch: main
