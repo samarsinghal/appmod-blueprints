@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ${{values.appname}}-dev-cd
+  name: ${{values.appname}}-prod-cd
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
@@ -9,11 +9,11 @@ spec:
   project: default
   destination:
     namespace: ${{values.namespace}}
-    name: dev-server
+    name: prod-server
   source:
     repoURL: http://${{values.hostname}}/gitea/giteaAdmin/${{values.appname}}
     targetRevision: main
-    path: deployment/dev
+    path: deployment/prod
   syncPolicy:
     automated:
       prune: true
