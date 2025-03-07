@@ -1,9 +1,9 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: s3-bucket-template-crossplane
-  title: S3 Bucket Template Crosspane
-  description: Create S3 bucket using OAM and CrossPlane
+  name: s3-bucket-template-ack
+  title: S3 Bucket Template ACK
+  description: Create S3 bucket using OAM and ACK
 spec:
   owner: guest
   type: service
@@ -24,11 +24,6 @@ spec:
           type: string
           description: The environment (e.g., dev, prod)
           enum: ['dev', 'prod']
-        provider:
-          title: Provider
-          type: string
-          description: Provider Configuration
-          default: default
         region:
           title: Region
           type: string
@@ -54,7 +49,6 @@ spec:
       input:
         url: ./skeleton
         values:
-          provider: ${{ parameters.provider }}
           bucket_name: ${{ parameters.bucket_name }}
           configuration: ${{ parameters.configuration }}
           namespace: ${{ parameters.namespace }}
