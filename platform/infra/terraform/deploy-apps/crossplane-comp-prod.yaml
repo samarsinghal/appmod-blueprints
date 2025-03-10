@@ -1,21 +1,18 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: crossplane-compositions
+  name: crossplane-compositions-prod
   namespace: argocd
-  labels:
-    env: dev
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
-  project: modern-engg
+  project: default
   source:
     repoURL: ${GITHUB_URL}
     targetRevision: ${GITHUB_BRANCH}
     path: "platform/crossplane/compositions"
   destination:
-    server: "https://kubernetes.default.svc"
+    name: 'prod-cluster'
     namespace: crossplane-system
   syncPolicy:
-    automated: {}
+    automated:
+      selfHeal: true
     syncOptions: []
