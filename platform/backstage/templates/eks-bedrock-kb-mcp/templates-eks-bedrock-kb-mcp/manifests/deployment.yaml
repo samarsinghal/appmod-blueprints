@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bedrock-kb-mcp
+  namespace: ${{values.namespace}}
+  labels:
+    app: bedrock-kb-mcp
+    app.kubernetes.io/name: bedrock-kb-mcp
+    app.kubernetes.io/part-of: mcp
+spec:
+  replicas: ${{values.replicas}}
+  selector:
+    matchLabels:
+      app: bedrock-kb-mcp
+  template:
+    metadata:
+      labels:
+        app: bedrock-kb-mcp
+    spec:
+      serviceAccountName: bedrock-kb-mcp-sa
+      containers:
+      - name: bedrock-kb-mcp
+        image: public.ecr.aws/mcp/bedrock-kb-retrieval-mcp-server:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 50051
+          name: grpc
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: bedrock-kb-mcp-config
+        - secretRef:
+            name: bedrock-kb-mcp-keycloak
+        env:
+        - name: AWS_ROLE_ARN
+          value: "${{values.roleArn}}"
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        volumeMounts:
+        - name: aws-iam-token
+          mountPath: /var/run/secrets/eks.amazonaws.com/serviceaccount
+          readOnly: true
+      volumes:
+      - name: aws-iam-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 86400
+              audience: sts.amazonaws.com

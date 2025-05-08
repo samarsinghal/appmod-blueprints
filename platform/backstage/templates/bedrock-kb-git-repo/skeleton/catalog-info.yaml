@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bedrock-kb-${{values.kb_name}}
+  description: Bedrock Knowledge Base for ${{ values.kb_name }}
+  annotations:
+    backstage.io/kubernetes-namespace: ${{values.namespace}}
+    argocd/app-name: ${{values.kb_name}}-kb
+spec:
+  type: bedrock-kb
+  lifecycle: experimental
+  owner: guest
+  system: ${{values.kb_name | dump}}

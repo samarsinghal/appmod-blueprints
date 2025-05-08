@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bedrock-kb-mcp-iam-policy
+  namespace: ${{values.namespace}}
+data:
+  policy.json: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "bedrock:ListKnowledgeBases",
+            "bedrock:GetKnowledgeBase",
+            "bedrock:ListDataSources",
+            "bedrock:GetDataSource",
+            "bedrock:Retrieve",
+            "bedrock:Rerank",
+            "bedrock:InvokeModel"
+          ],
+          "Resource": "*"
+        }
+      ]
+    }

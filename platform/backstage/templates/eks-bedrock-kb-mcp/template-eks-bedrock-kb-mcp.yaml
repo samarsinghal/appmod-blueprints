@@ -1,0 +1,152 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: eks-bedrock-kb-mcp
+  title: EKS Bedrock Knowledge Base MCP Server
+  description: Deploy Bedrock Knowledge Base MCP Server on EKS with Keycloak integration for Amazon Q Developer
+spec:
+  owner: guest
+  type: service
+  parameters:
+    - title: Cluster Configuration
+      required:
+        - clusterName
+        - region
+      properties:
+        clusterName:
+          title: EKS Cluster Name
+          type: string
+          description: Name of the EKS cluster to deploy to
+        region:
+          title: AWS Region
+          type: string
+          description: AWS region for the EKS cluster and Bedrock services
+          default: us-east-1
+          enum: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-northeast-1', 'ap-southeast-1', 'ap-southeast-2']
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          description: Namespace to deploy the MCP server in
+          default: mcp-system
+    
+    - title: IAM Configuration
+      required:
+        - roleArn
+      properties:
+        roleArn:
+          title: IAM Role ARN
+          type: string
+          description: ARN of the IAM role with permissions for Bedrock Knowledge Bases and S3
+    
+    - title: MCP Server Configuration
+      properties:
+        replicas:
+          title: Replicas
+          type: integer
+          description: Number of MCP server replicas
+          default: 2
+        logLevel:
+          title: Log Level
+          type: string
+          description: Log level for the MCP server
+          default: INFO
+          enum: ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+    
+    - title: Keycloak Configuration
+      required:
+        - keycloakUrl
+        - keycloakRealm
+        - keycloakClientId
+      properties:
+        keycloakUrl:
+          title: Keycloak URL
+          type: string
+          description: URL of the Keycloak server
+        keycloakRealm:
+          title: Keycloak Realm
+          type: string
+          description: Keycloak realm for authentication
+          default: mcp
+        keycloakClientId:
+          title: Keycloak Client ID
+          type: string
+          description: Client ID for the MCP server in Keycloak
+          default: bedrock-kb-mcp
+        keycloakClientSecret:
+          title: Keycloak Client Secret
+          type: string
+          description: Client secret for the MCP server in Keycloak
+          ui:widget: password
+    
+    - title: Knowledge Base Configuration
+      properties:
+        kbTagKey:
+          title: Knowledge Base Tag Key
+          type: string
+          description: Tag key to identify knowledge bases for MCP
+          default: mcp-multirag-kb
+        kbTagValue:
+          title: Knowledge Base Tag Value
+          type: string
+          description: Tag value to identify knowledge bases for MCP
+          default: "true"
+  
+  steps:
+    - id: fetchSystem
+      name: Fetch System
+      action: catalog:fetch
+      input:
+        entityRef: system:default/system-info
+    
+    - id: template
+      name: Fetch Template
+      action: fetch:template
+      input:
+        url: ./templates-eks-bedrock-kb-mcp/
+        values:
+          clusterName: ${{ parameters.clusterName }}
+          region: ${{ parameters.region }}
+          namespace: ${{ parameters.namespace }}
+          roleArn: ${{ parameters.roleArn }}
+          replicas: ${{ parameters.replicas }}
+          logLevel: ${{ parameters.logLevel }}
+          keycloakUrl: ${{ parameters.keycloakUrl }}
+          keycloakRealm: ${{ parameters.keycloakRealm }}
+          keycloakClientId: ${{ parameters.keycloakClientId }}
+          keycloakClientSecret: ${{ parameters.keycloakClientSecret }}
+          kbTagKey: ${{ parameters.kbTagKey }}
+          kbTagValue: ${{ parameters.kbTagValue }}
+    
+    - id: publish
+      name: Publishing to a gitea git repository
+      action: publish:gitea
+      input:
+        description: Bedrock Knowledge Base MCP Server on EKS with Keycloak integration
+        repoUrl: ${{ steps['fetchSystem'].output.entity.spec.hostname }}/gitea?repo=eks-bedrock-kb-mcp-${{parameters.clusterName}}
+        defaultBranch: main
+    
+    - id: create-argocd-app
+      name: Create ArgoCD App
+      action: cnoe:create-argocd-app
+      input:
+        appName: eks-bedrock-kb-mcp-${{parameters.clusterName}}
+        appNamespace: ${{parameters.namespace}}
+        argoInstance: in-cluster
+        projectName: default
+        repoUrl: http://my-gitea-http.gitea.svc.cluster.local:3000/giteaAdmin/eks-bedrock-kb-mcp-${{parameters.clusterName}}
+        path: "manifests"
+    
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+  
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

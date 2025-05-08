@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: git-clone-to-s3-${{values.kb_name}}
+  namespace: ${{values.namespace}}
+spec:
+  template:
+    spec:
+      containers:
+      - name: git-clone-to-s3
+        image: amazon/aws-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Install git
+          yum install -y git
+
+          # Create a temporary directory
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
+
+          # Clone the repository
+          git clone --depth 1 --branch $BRANCH $REPO_URL repo
+          cd repo
+
+          # Upload to S3
+          aws s3 sync . s3://$BUCKET_NAME/ --delete
+
+          # Clean up
+          cd /
+          rm -rf $TEMP_DIR
+        env:
+        - name: REPO_URL
+          value: "${{values.repo_url}}"
+        - name: BRANCH
+          value: "${{values.branch}}"
+        - name: BUCKET_NAME
+          value: "${{values.bucket_name}}"
+        - name: AWS_REGION
+          value: "${{values.region}}"
+      restartPolicy: Never
+  backoffLimit: 2

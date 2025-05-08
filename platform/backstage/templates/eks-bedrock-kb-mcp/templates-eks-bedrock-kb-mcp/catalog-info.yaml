@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: eks-bedrock-kb-mcp-${{values.clusterName}}
+  description: Bedrock Knowledge Base MCP Server on EKS with Keycloak integration
+  annotations:
+    backstage.io/kubernetes-namespace: ${{values.namespace}}
+    argocd/app-name: eks-bedrock-kb-mcp-${{values.clusterName}}
+spec:
+  type: service
+  lifecycle: production
+  owner: guest
+  system: mcp
+  dependsOn:
+    - component:default/bedrock-kb-retrieval-mcp-server
+  providesApis:
+    - mcp-bedrock-kb-api

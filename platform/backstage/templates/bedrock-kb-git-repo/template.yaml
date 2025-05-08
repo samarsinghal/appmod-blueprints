@@ -1,0 +1,116 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: bedrock-kb-git-repo-template
+  title: Bedrock Knowledge Base from Git Repository
+  description: Create an Amazon Bedrock Knowledge Base from a Git repository
+spec:
+  owner: guest
+  type: service
+  parameters:
+    - title: Provide Git Repository Information
+      required:
+        - repo_url
+        - branch
+      properties:
+        repo_url:
+          title: Git Repository URL
+          type: string
+          description: URL of the Git repository to use as a data source
+          ui:field: RepoUrlPicker
+        branch:
+          title: Branch
+          type: string
+          description: Branch of the Git repository to use
+          default: main
+    
+    - title: Provide Knowledge Base Information
+      required:
+        - kb_name
+        - region
+        - bucket_name
+        - role_arn
+      properties:
+        kb_name:
+          title: Knowledge Base Name
+          type: string
+          description: Name of the Bedrock Knowledge Base
+        region:
+          title: AWS Region
+          type: string
+          description: AWS region for the Knowledge Base
+          default: us-east-1
+          enum: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-northeast-1', 'ap-southeast-1', 'ap-southeast-2']
+        bucket_name:
+          title: S3 Bucket Name
+          type: string
+          description: Name of the S3 bucket to store repository content
+        role_arn:
+          title: IAM Role ARN
+          type: string
+          description: ARN of the IAM role with permissions for Bedrock and S3
+        namespace:
+          default: default
+          title: Kubernetes namespace to create resources in
+          type: string
+  steps:
+    - id: fetchSystem
+      name: Fetch System
+      action: catalog:fetch
+      input:
+        entityRef: system:default/system-info
+    
+    - id: template
+      name: Fetch Skeleton + Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          repo_url: ${{ parameters.repo_url }}
+          branch: ${{ parameters.branch }}
+          kb_name: ${{ parameters.kb_name }}
+          region: ${{ parameters.region }}
+          bucket_name: ${{ parameters.bucket_name }}
+          role_arn: ${{ parameters.role_arn }}
+          namespace: ${{ parameters.namespace }}
+          repoUrl: ${{ steps['fetchSystem'].output.entity.spec.hostname }}/gitea
+    
+    - id: publish
+      name: Publishing to a gitea git repository
+      action: publish:gitea
+      input:
+        description: Bedrock Knowledge Base from Git Repository
+        repoUrl: ${{ steps['fetchSystem'].output.entity.spec.hostname }}/gitea?repo=${{parameters.kb_name}}-kb
+        defaultBranch: main
+    
+    - id: create-argocd-app
+      name: Create ArgoCD App
+      action: cnoe:create-argocd-app
+      input:
+        appName: ${{parameters.kb_name}}-kb
+        appNamespace: default
+        argoInstance: in-cluster
+        projectName: default
+        repoUrl: http://my-gitea-http.gitea.svc.cluster.local:3000/giteaAdmin/${{parameters.kb_name}}-kb
+        path: "manifests"
+    
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+    
+    - id: template-output
+      name: Template Output
+      action: debug:log
+      input:
+        listWorkspace: true
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

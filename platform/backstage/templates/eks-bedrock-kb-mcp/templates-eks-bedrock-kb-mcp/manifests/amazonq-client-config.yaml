@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amazonq-client-config
+  namespace: ${{values.namespace}}
+data:
+  amazonq-mcp.json: |
+    {
+      "version": "1.0",
+      "mcps": [
+        {
+          "name": "bedrock-kb-mcp",
+          "endpoint": "http://LOAD_BALANCER_URL:8080",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": {
+              "clientId": "${{values.keycloakClientId}}",
+              "authorizationEndpoint": "https://${{values.keycloakUrl}}/realms/${{values.keycloakRealm}}/protocol/openid-connect/auth",
+              "tokenEndpoint": "https://${{values.keycloakUrl}}/realms/${{values.keycloakRealm}}/protocol/openid-connect/token"
+            }
+          }
+        }
+      ]
+    }
+  setup-amazonq.sh: |
+    #!/bin/bash
+    
+    # Get the load balancer URL
+    LB_URL=$(kubectl get svc -n ${{values.namespace}} bedrock-kb-mcp-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    
+    # Create the amazonq directory if it doesn't exist
+    mkdir -p ~/.aws/amazonq
+    
+    # Create the mcp.json file with the load balancer URL
+    cat > ~/.aws/amazonq/mcp.json << EOF
+    {
+      "version": "1.0",
+      "mcps": [
+        {
+          "name": "bedrock-kb-mcp",
+          "endpoint": "http://${LB_URL}:8080",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": {
+              "clientId": "${{values.keycloakClientId}}",
+              "authorizationEndpoint": "https://${{values.keycloakUrl}}/realms/${{values.keycloakRealm}}/protocol/openid-connect/auth",
+              "tokenEndpoint": "https://${{values.keycloakUrl}}/realms/${{values.keycloakRealm}}/protocol/openid-connect/token"
+            }
+          }
+        }
+      ]
+    }
+    EOF
+    
+    echo "Amazon Q Developer configuration has been set up at ~/.aws/amazonq/mcp.json"
+    echo "You can now use Amazon Q Developer to query your knowledge bases:"
+    echo "q chat \"What information do we have about project X?\""

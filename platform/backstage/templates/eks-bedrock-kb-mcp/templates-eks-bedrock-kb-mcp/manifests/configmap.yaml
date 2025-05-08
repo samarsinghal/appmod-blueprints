@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bedrock-kb-mcp-config
+  namespace: ${{values.namespace}}
+data:
+  FASTMCP_LOG_LEVEL: "${{values.logLevel}}"
+  AWS_REGION: "${{values.region}}"
+  GRPC_BIND_ADDRESS: "0.0.0.0"
+  FASTMCP_BIND_ADDRESS: "0.0.0.0"
+  KB_TAG_KEY: "${{values.kbTagKey}}"
+  KB_TAG_VALUE: "${{values.kbTagValue}}"

@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-bedrock-kb-${{values.kb_name}}
+  namespace: ${{values.namespace}}
+spec:
+  template:
+    spec:
+      containers:
+      - name: create-bedrock-kb
+        image: amazon/aws-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Create the knowledge base
+          echo "Creating knowledge base $KB_NAME in region $REGION..."
+          aws bedrock-agent create-knowledge-base \
+            --name "$KB_NAME" \
+            --description "Knowledge base created from Git repository $REPO_URL" \
+            --knowledge-base-configuration "{\"type\": \"VECTOR\", \"vectorKnowledgeBaseConfiguration\": {\"embeddingModelArn\": \"arn:aws:bedrock:$REGION::foundation-model/amazon.titan-embed-text-v1\"}}" \
+            --role-arn "$ROLE_ARN" \
+            --tags "{\"mcp-multirag-kb\": \"true\"}" \
+            --region "$REGION"
+          
+          # Wait for the knowledge base to be created
+          echo "Waiting for knowledge base to be created..."
+          sleep 30
+          
+          # Get the knowledge base ID
+          KB_ID=$(aws bedrock-agent list-knowledge-bases --region $REGION --query "knowledgeBaseSummaries[?name=='$KB_NAME'].knowledgeBaseId" --output text)
+          
+          if [ -z "$KB_ID" ]; then
+            echo "Failed to get knowledge base ID. Knowledge base may still be creating."
+            exit 1
+          fi
+          
+          echo "Knowledge base ID: $KB_ID"
+          
+          # Create a data source configuration file
+          cat > data-source-config.json << EOF
+          {
+            "dataSourceConfiguration": {
+              "type": "S3",
+              "s3Configuration": {
+                "bucketArn": "arn:aws:s3:::$BUCKET_NAME"
+              }
+            },
+            "name": "GitRepoDataSource",
+            "description": "Data source from Git repository $REPO_URL"
+          }
+          EOF
+          
+          # Create the data source
+          echo "Creating data source..."
+          aws bedrock-agent create-data-source \
+            --knowledge-base-id "$KB_ID" \
+            --cli-input-json file://data-source-config.json \
+            --region "$REGION"
+          
+          echo "Data source creation initiated. Check the AWS console for status."
+        env:
+        - name: KB_NAME
+          value: "${{values.kb_name}}"
+        - name: REGION
+          value: "${{values.region}}"
+        - name: ROLE_ARN
+          value: "${{values.role_arn}}"
+        - name: BUCKET_NAME
+          value: "${{values.bucket_name}}"
+        - name: REPO_URL
+          value: "${{values.repo_url}}"
+      restartPolicy: Never
+  backoffLimit: 2
